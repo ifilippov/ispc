@@ -145,6 +145,58 @@ def check_test(filename):
             done = False
     return done
 
+def run_pattern(filename, ispc_exe_rel):
+    if options.no_opt or "generic" in options.target:
+        return 0
+    xmlname = filename[:-4] + "xml"
+    dom = xml.dom.minidom.parse(xmlname)
+    types = dom.getElementsByTagName("type")
+    for i in range(0,len(types)):
+        name = types[i].getElementsByTagName("name")
+        platforms = types[i].getElementsByTagName("platform")
+        for j in range (0,len(platforms)):
+            pl = ((platforms[j].getElementsByTagName("name"))[0]).childNodes[0].data
+            if options.target in pl and options.arch in pl:
+                r1 = r2 = r3 = 0
+                o1 = o2 = o3 = ""
+                if name[0].childNodes[0].data == "ASM":
+                    ispc_cmd = ispc_exe_rel + \
+                    " --emit-asm --woff %s -o tmp.s --arch=%s --target=%s" % \
+                    (filename, options.arch, options.target)
+                    (r1, o1) = run_command(ispc_cmd)
+                if name[0].childNodes[0].data == "LLVM":
+                    ispc_cmd = ispc_exe_rel + \
+                    " --emit-llvm --woff %s -o tmp1.s --arch=%s --target=%s" % \
+                    (filename, options.arch, options.target) 
+                    (r2, o2) = run_command(ispc_cmd)
+                    (r3, o3) = run_command("llvm-dis tmp1.s -o tmp.s")
+                if r1 + r2 + r3 != 0:
+                    print_debug("Compilation of test %s failed            \n" % filename, s, run_tests_log)
+                    if o1 + o2 + o3 != "":
+                        print_debug("%s" % (o1 + o2 + o3).encode("utf-8"), s, run_tests_log)
+                    return 1
+                b = buffer(file("tmp.s").read());
+                search = platforms[j].getElementsByTagName("search")
+                notsearch = platforms[j].getElementsByTagName("notsearch")
+                for k in range(0,len(search)):
+                    se = search[k].childNodes[0].data
+                    l = re.finditer(".*" + se + ".*", b)
+                    a = 0
+                    for ll in l:
+                        a = 1
+                    if a != 1:
+                        print_debug("Pattern test " + filename + " failed. Not found pattern " + se + ".\n", s, run_tests_log)
+                        return 1
+                for k in range(0,len(notsearch)):
+                    se = notsearch[k].childNodes[0].data
+                    l = re.finditer(".*" + se + ".*", b)
+                    a = 0
+                    for ll in l:
+                        a = 1
+                    if a == 1:
+                        print_debug("Pattern test " + filename + " failed. Found pattern " + se + ".\n", s, run_tests_log)
+                        return 1
+    return 0
 
 def run_test(testname):
     # testname is a path to the test from the root of ispc dir
@@ -152,6 +204,10 @@ def run_test(testname):
     # ispc_exe_rel is a relative path to ispc
     filename = add_prefix(testname)
     ispc_exe_rel = add_prefix(ispc_exe)
+
+    pattern = (filename.find("tests_patterns") != -1)
+    if pattern == True:
+        return (run_pattern(filename, ispc_exe_rel), 0)
 
     # is this a test to make sure an error is issued?
     want_error = (filename.find("tests_errors") != -1)
@@ -580,7 +636,8 @@ def run_tests(options1, args, print_version):
     # failing_tests/, and tests_errors/
     if len(args) == 0:
         files = glob.glob(ispc_root + os.sep + "tests" + os.sep + "*ispc") + \
-            glob.glob(ispc_root + os.sep + "tests_errors" + os.sep + "*ispc")
+            glob.glob(ispc_root + os.sep + "tests_errors" + os.sep + "*ispc") + \
+            glob.glob(ispc_root + os.sep + "tests_patterns" + os.sep + "*ispc")
     else:
         if is_windows:
             argfiles = [ ]
@@ -710,6 +767,7 @@ import platform
 import tempfile
 import os.path
 import time
+import xml.dom.minidom
 # our functions
 import common
 print_debug = common.print_debug

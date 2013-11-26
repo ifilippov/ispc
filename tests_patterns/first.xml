@@ -1,0 +1,32 @@
+<test>
+  <type>
+    <name>ASM</name>
+    <platform>
+      <name>avx2-i32x16 x86</name>
+      <search>QQQ!!!QQQ</search>
+      <search>UUU</search>
+      <notsearch>III</notsearch>
+    </platform>
+    <platform>
+      <name>sse</name>
+      <search>wQQ!!!QQQ</search>
+      <search>UwU</search>
+      <notsearch>wII</notsearch> 
+    </platform>
+  </type>
+  <type>
+    <name>LLVM</name>
+    <platform>
+      <name>avx2-i32x16 x86</name>
+      <search>__mask</search>
+      <search>void</search>
+      <notsearch>void</notsearch>
+    </platform>
+    <platform>
+      <name>sse</name>
+      <search>wQzQQ</search>
+      <search>Uwz</search>
+      <notsearch>wxI</notsearch>
+    </platform>
+  </type>
+</test>
