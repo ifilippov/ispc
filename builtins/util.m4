@@ -3767,9 +3767,10 @@ done:
   ret i32 %nextoffset
 }
 
-define i32 @__packed_store_active(i32 * %startptr, <WIDTH x i32> %vals,
+define MASK @__packed_store_active(i32 * %startptr, <WIDTH x i32> %vals,
                                    <WIDTH x MASK> %full_mask) nounwind alwaysinline {
 entry:
+  %mmmask = sub <WIDTH x MASK> <forloop(i1, 0, eval(WIDTH-2), `MASK 0, ') MASK 0>, %full_mask
   %mask = call i64 @__movmsk(<WIDTH x MASK> %full_mask)
   %mask_known = call i1 @__is_compile_time_constant_mask(<WIDTH x MASK> %full_mask)
   br i1 %mask_known, label %known_mask, label %unknown_mask
@@ -3781,39 +3782,28 @@ known_mask:
 all_on:
   %vecptr = bitcast i32 *%startptr to <WIDTH x i32> *
   store <WIDTH x i32> %vals, <WIDTH x i32> * %vecptr, align 4
-  ret i32 WIDTH
+  ret MASK WIDTH
 
 unknown_mask:
   br label %loop
 
 loop:
-  %lane = phi i32 [ 0, %unknown_mask ], [ %nextlane, %loopend ]
-  %lanemask = phi i64 [ 1, %unknown_mask ], [ %nextlanemask, %loopend ]
-  %offset = phi i32 [ 0, %unknown_mask ], [ %nextoffset, %loopend ]
-
-  ; is the current lane on?
-  %and = and i64 %mask, %lanemask
-  %do_store = icmp eq i64 %and, %lanemask
-  br i1 %do_store, label %store, label %loopend 
-
-store:
-  %storeval = extractelement <WIDTH x i32> %vals, i32 %lane
-  %storeptr = getelementptr i32 *%startptr, i32 %offset
+  %offset = phi MASK [ 0, %unknown_mask ], [ %ch_offset, %loop ]
+  %i = phi i32 [ 0, %unknown_mask ], [ %ch_i, %loop ]
+  %storeval = extractelement <WIDTH x i32> %vals, i32 %i
+  %storeptr = getelementptr i32 *%startptr, MASK %offset
   store i32 %storeval, i32 *%storeptr
-  %offset1 = add i32 %offset, 1
-  br label %loopend
 
-loopend:
-  %nextoffset = phi i32 [ %offset1, %store ], [ %offset, %loop ]
-  %nextlane = add i32 %lane, 1
-  %nextlanemask = mul i64 %lanemask, 2
+  %mull_mask = extractelement <WIDTH x MASK> %mmmask, i32 %i
+  %ch_offset = add MASK %mull_mask, %offset
 
   ; are we done yet?
-  %test = icmp ne i32 %nextlane, WIDTH
+  %ch_i = add i32 %i, 1
+  %test = icmp ne i32 %ch_i, WIDTH
   br i1 %test, label %loop, label %done
 
 done:
-  ret i32 %nextoffset
+  ret MASK %ch_offset
 }
 ')
 
